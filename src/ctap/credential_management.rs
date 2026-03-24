@@ -15,6 +15,7 @@
 use super::super::clock::CtapInstant;
 use super::client_pin::{ClientPin, PinPermission};
 use super::command::AuthenticatorCredentialManagementParameters;
+use super::crypto_wrapper::PrivateKey;
 use super::data_formats::{
     CredentialManagementSubCommand, CredentialManagementSubCommandParameters,
     PublicKeyCredentialDescriptor, PublicKeyCredentialRpEntity, PublicKeyCredentialSource,
@@ -93,7 +94,10 @@ fn enumerate_credentials_response(
         key_id: credential_id,
         transports: None, // You can set USB as a hint here.
     };
-    let public_key = private_key.get_pub_key(env)?;
+    let public_key = match &private_key {
+        PrivateKey::Hybrid(hybrid_key) => hybrid_key.genpk_ecdsa().into(),
+        _ => private_key.get_pub_key(env)?,
+    };
     Ok(AuthenticatorCredentialManagementResponse {
         user: Some(user),
         credential_id: Some(credential_id),
@@ -361,7 +365,9 @@ pub fn process_credential_management(
 #[cfg(test)]
 mod test {
     use super::super::crypto_wrapper::PrivateKey;
-    use super::super::data_formats::{PinUvAuthProtocol, PublicKeyCredentialType};
+    use super::super::data_formats::{
+        PinUvAuthProtocol, PublicKeyCredentialType, SignatureAlgorithm,
+    };
     use super::super::pin_protocol::authenticate_pin_uv_auth_token;
     use super::super::CtapState;
     use super::*;
@@ -386,6 +392,21 @@ mod test {
             cred_blob: None,
             large_blob_key: None,
         }
+    }
+
+    #[test]
+    fn test_enumerate_credentials_response_compacts_hybrid_public_key() {
+        let mut env = TestEnv::new();
+        let mut credential = create_credential_source(&mut env);
+        credential.private_key = PrivateKey::new(&mut env, SignatureAlgorithm::Hybrid);
+
+        let response = enumerate_credentials_response(&mut env, credential, Some(1)).unwrap();
+        let public_key = response.public_key.unwrap();
+        let mut encoded_cose_key = Vec::new();
+        super::super::cbor_write(public_key.into(), &mut encoded_cose_key).unwrap();
+
+        // Full hybrid keys include a ~1952-byte ML-DSA public key and are much larger.
+        assert!(encoded_cose_key.len() < 512);
     }
 
     fn test_helper_process_get_creds_metadata(pin_uv_auth_protocol: PinUvAuthProtocol) {

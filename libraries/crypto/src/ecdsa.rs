@@ -85,9 +85,17 @@ impl SecKey {
     where
         H: Hash256,
     {
-        let m = ExponentP256::modn(Int256::from_bin(&H::hash(msg)));
+        self.sign_hash_rfc6979::<H>(&H::hash(msg))
+    }
 
-        let mut rfc_6979 = Rfc6979::<H>::new(self, &msg);
+    /// Creates a deterministic ECDSA signature over a precomputed message hash.
+    pub fn sign_hash_rfc6979<H>(&self, hash: &[u8; 32]) -> Signature
+    where
+        H: Hash256,
+    {
+        let m = ExponentP256::modn(Int256::from_bin(hash));
+
+        let mut rfc_6979 = Rfc6979::<H>::new_from_hash(self, hash);
         loop {
             let k = NonZeroExponentP256::from_int_checked(rfc_6979.next());
             // The branching here is fine. By design the algorithm of RFC 6976 has a running time
@@ -134,9 +142,10 @@ impl SecKey {
     where
         H: Hash256,
     {
-        let m = ExponentP256::modn(Int256::from_bin(&H::hash(msg)));
+        let hash = H::hash(msg);
+        let m = ExponentP256::modn(Int256::from_bin(&hash));
 
-        let mut rfc_6979 = Rfc6979::<H>::new(self, &msg);
+        let mut rfc_6979 = Rfc6979::<H>::new_from_hash(self, &hash);
         loop {
             let k = NonZeroExponentP256::from_int_checked(rfc_6979.next());
             if bool::from(k.is_none()) {
@@ -168,32 +177,41 @@ impl SecKey {
 
 impl Signature {
     pub const BYTES_LENGTH: usize = 2 * int256::NBYTES;
+    pub const MAX_ASN1_DER_LENGTH: usize = 72;
 
-    /// Converts a signature to its ASN1 DER representation.
-    pub fn to_asn1_der(&self) -> Vec<u8> {
+    pub fn to_asn1_der_len(&self) -> usize {
+        let r_encoding = self.r.to_int().to_minimal_encoding();
+        let s_encoding = self.s.to_int().to_minimal_encoding();
+        r_encoding.len() + s_encoding.len() + 6
+    }
+
+    pub fn to_asn1_der_out(&self, out: &mut [u8]) -> usize {
         const DER_INTEGER_TYPE: u8 = 0x02;
         const DER_DEF_LENGTH_SEQUENCE: u8 = 0x30;
 
         let r_encoding = self.r.to_int().to_minimal_encoding();
         let s_encoding = self.s.to_int().to_minimal_encoding();
-        // We rely on the encoding to be short enough such that
-        // sum of lengths + 4 still fits into 7 bits.
-        #[cfg(test)]
-        assert!(r_encoding.len() <= 33);
-        #[cfg(test)]
-        assert!(s_encoding.len() <= 33);
-        // The ASN1 of a signature is a two member sequence. Its length is the
-        // sum of the integer encoding lengths and 2 header bytes per integer.
-        let mut encoding = vec![
-            DER_DEF_LENGTH_SEQUENCE,
-            (r_encoding.len() + s_encoding.len() + 4) as u8,
-        ];
-        encoding.push(DER_INTEGER_TYPE);
-        encoding.push(r_encoding.len() as u8);
-        encoding.extend(r_encoding);
-        encoding.push(DER_INTEGER_TYPE);
-        encoding.push(s_encoding.len() as u8);
-        encoding.extend(s_encoding);
+        let total_len = self.to_asn1_der_len();
+        assert!(out.len() >= total_len);
+
+        out[0] = DER_DEF_LENGTH_SEQUENCE;
+        out[1] = (r_encoding.len() + s_encoding.len() + 4) as u8;
+        out[2] = DER_INTEGER_TYPE;
+        out[3] = r_encoding.len() as u8;
+        out[4..4 + r_encoding.len()].copy_from_slice(&r_encoding);
+
+        let s_type = 4 + r_encoding.len();
+        out[s_type] = DER_INTEGER_TYPE;
+        out[s_type + 1] = s_encoding.len() as u8;
+        out[s_type + 2..s_type + 2 + s_encoding.len()].copy_from_slice(&s_encoding);
+
+        total_len
+    }
+
+    /// Converts a signature to its ASN1 DER representation.
+    pub fn to_asn1_der(&self) -> Vec<u8> {
+        let mut encoding = vec![0u8; self.to_asn1_der_len()];
+        self.to_asn1_der_out(&mut encoding);
         encoding
     }
 
@@ -299,8 +317,7 @@ impl<H> Rfc6979<H>
 where
     H: Hash256,
 {
-    pub fn new(sk: &SecKey, msg: &[u8]) -> Rfc6979<H> {
-        let h1 = H::hash(msg);
+    pub fn new_from_hash(sk: &SecKey, h1: &[u8; 32]) -> Rfc6979<H> {
         let v = [0x01; 32];
         let k = [0x00; 32];
 
@@ -310,7 +327,7 @@ where
         contents_v.copy_from_slice(&v);
         marker[0] = 0x00;
         Int256::to_bin(&sk.k.to_int(), contents_k);
-        Int256::to_bin(&Int256::from_bin(&h1).modd(&Int256::N), contents_h1);
+        Int256::to_bin(&Int256::from_bin(h1).modd(&Int256::N), contents_h1);
 
         let k = hmac_256::<H>(&k, &contents);
         let v = hmac_256::<H>(&k, &v);

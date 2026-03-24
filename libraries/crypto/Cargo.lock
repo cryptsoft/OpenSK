@@ -39,10 +39,54 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
+name = "block-buffer"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a076c298b9ecdb530ed9d967e74a6027d6a7478924520acddcddc24c1c8ab3ab"
+dependencies = [
+ "arrayref",
+ "byte-tools",
+]
+
+[[package]]
+name = "bouncycastle-core-interface"
+version = "0.1.1"
+dependencies = [
+ "bouncycastle-utils",
+]
+
+[[package]]
+name = "bouncycastle-mldsa"
+version = "0.1.2"
+dependencies = [
+ "bouncycastle-core-interface",
+ "bouncycastle-sha3",
+ "bouncycastle-utils",
+]
+
+[[package]]
+name = "bouncycastle-sha3"
+version = "0.1.1"
+dependencies = [
+ "bouncycastle-core-interface",
+ "bouncycastle-utils",
+]
+
+[[package]]
+name = "bouncycastle-utils"
+version = "0.1.1"
+
+[[package]]
 name = "bumpalo"
 version = "3.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f1e260c3a9040a7c19a12468758f4c16f31a81a1fe087482be9570ec864bb6c"
+
+[[package]]
+name = "byte-tools"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "560c32574a12a89ecd91f5e742165893f86e3ab98d21f8ea548658eb9eef5f40"
 
 [[package]]
 name = "byteorder"
@@ -72,12 +116,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "cpufeatures"
+version = "0.2.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "crypto"
 version = "0.1.0"
 dependencies = [
  "arrayref",
+ "bouncycastle-mldsa",
  "byteorder",
+ "dilithium",
  "hex",
+ "lang_items",
  "regex",
  "ring",
  "rng256",
@@ -88,16 +144,62 @@ dependencies = [
 ]
 
 [[package]]
+name = "digest"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03b072242a8cbaf9c145665af9d250c59af3b958f83ed6824e13533cf76d5b90"
+dependencies = [
+ "generic-array",
+]
+
+[[package]]
+name = "dilithium"
+version = "0.2.0-alpha.3"
+dependencies = [
+ "arrayref",
+ "byteorder",
+ "digest",
+ "itertools",
+ "rand_core 0.6.4",
+ "rng256",
+ "sha3",
+]
+
+[[package]]
+name = "either"
+version = "1.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
+
+[[package]]
 name = "fuchsia-cprng"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a06f77d526c1a601b7c4cdd98f54b5eaabffc14d5f2f0296febdc7f357c6d3ba"
 
 [[package]]
+name = "generic-array"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d00328cedcac5e81c683e5620ca6a30756fc23027ebf9bff405c0e8da1fbb7e"
+dependencies = [
+ "typenum",
+]
+
+[[package]]
 name = "hex"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
+
+[[package]]
+name = "itertools"
+version = "0.7.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d47946d458e94a1b7bcabbf6521ea7c037062c81f534615abcad76e84d4970d"
+dependencies = [
+ "either",
+]
 
 [[package]]
 name = "itoa"
@@ -115,6 +217,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "keccak"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb26cec98cce3a3d96cbb7bced3c4b16e3d13f27ec56dbd62cbc8f39cfb9d653"
+dependencies = [
+ "cpufeatures",
+]
+
+[[package]]
+name = "lang_items"
+version = "0.1.0"
+dependencies = [
+ "libtock_core",
+ "libtock_drivers",
+ "linked_list_allocator",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -122,9 +242,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.133"
+version = "0.2.160"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0f80d65747a3e43d1596c7c5492d95d5edddaabd45a7fcdb02b95f644164966"
+checksum = "f0b21006cd1874ae9e650973c565615676dc4a274c965bb0a73796dac838ce4f"
 
 [[package]]
 name = "libtock_codegen"
@@ -148,6 +268,12 @@ version = "0.1.0"
 dependencies = [
  "libtock_core",
 ]
+
+[[package]]
+name = "linked_list_allocator"
+version = "0.8.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "822add9edb1860698b79522510da17bef885171f75aa395cff099d770c609c24"
 
 [[package]]
 name = "log"
@@ -231,6 +357,12 @@ name = "rand_core"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c33a3c44ca05fa6f1807d8e6743f3824e8509beca625669633be0acbdf509dc"
+
+[[package]]
+name = "rand_core"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 
 [[package]]
 name = "rand_hc"
@@ -382,6 +514,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha3"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b64dcef59ed4290b9fb562b53df07f564690d6539e8ecdd4728cf392477530bc"
+dependencies = [
+ "block-buffer",
+ "byte-tools",
+ "digest",
+ "keccak",
+]
+
+[[package]]
 name = "spin"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -403,6 +547,12 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "typenum"
+version = "1.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "562d481066bde0658276a35467c4af00bdc6ee726305698a55b86e61d7ad82bb"
 
 [[package]]
 name = "unicode-ident"

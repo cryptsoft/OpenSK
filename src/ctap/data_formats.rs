@@ -25,7 +25,7 @@ use crypto::{ecdh, ecdsa, hybrid};
 #[cfg(test)]
 use enum_iterator::IntoEnumIterator;
 use sk_cbor::{cbor_array_vec, cbor_bytes, cbor_map_options, destructure_cbor_map};
-use {dilithium, sk_cbor as cbor};
+use sk_cbor as cbor;
 
 // Used as the identifier for ECDSA in assertion signatures and COSE.
 pub const ES256_ALGORITHM: i64 = -7;
@@ -35,6 +35,8 @@ pub const EDDSA_ALGORITHM: i64 = -8;
 // (numbers less than -65536 are reserved for private use)
 // TODO: Update this number later.
 pub const HYBRID_ALGORITHM: i64 = -65537;
+// ML-DSA-65 verification key bytes.
+const MLDSA65_PK_SIZE_PACKED: usize = 1952;
 
 // https://www.w3.org/TR/webauthn/#dictdef-publickeycredentialrpentity
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -807,7 +809,7 @@ impl TryFrom<cbor::Value> for CoseKey {
             None
         } else {
             let dilithium_bytes = extract_byte_string(ok_or_missing(dilithium_bytes)?)?;
-            if dilithium_bytes.len() != dilithium::params::PK_SIZE_PACKED {
+            if dilithium_bytes.len() != MLDSA65_PK_SIZE_PACKED {
                 return Err(Ctap2StatusCode::CTAP1_ERR_INVALID_PARAMETER);
             }
             Some(dilithium_bytes)
@@ -898,9 +900,8 @@ impl From<hybrid::PubKey> for CoseKey {
         let mut ecdsa_y_bytes = [0; ecdsa::NBYTES];
         pk.ecdsa_pk
             .to_coordinates(&mut ecdsa_x_bytes, &mut ecdsa_y_bytes);
-        let mut dilithium_bytes = vec![0; dilithium::params::PK_SIZE_PACKED];
-        let bytes_ref = array_mut_ref!(dilithium_bytes, 0, dilithium::params::PK_SIZE_PACKED);
-        pk.dilithium_pk.to_bytes(bytes_ref);
+        let mut dilithium_bytes = vec![0; MLDSA65_PK_SIZE_PACKED];
+        dilithium_bytes.copy_from_slice(&pk.mldsa65_pk);
         CoseKey {
             x_bytes: ecdsa_x_bytes,
             y_bytes: ecdsa_y_bytes,

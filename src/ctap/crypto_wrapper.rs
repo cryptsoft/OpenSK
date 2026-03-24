@@ -235,7 +235,7 @@ fn ecdsa_key_from_seed(
     seed: &[u8; 32],
 ) -> Result<ecdsa::SecKey, Ctap2StatusCode> {
     let ecdsa_bytes = env.key_store().derive_ecdsa(seed)?;
-    Ok(ecdsa::SecKey::from_bytes(&ecdsa_bytes).unwrap())
+    ecdsa::SecKey::from_bytes(&ecdsa_bytes).ok_or(Ctap2StatusCode::CTAP2_ERR_VENDOR_INTERNAL_ERROR)
 }
 
 impl From<&PrivateKey> for cbor::Value {
