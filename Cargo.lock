@@ -140,7 +140,6 @@ dependencies = [
  "arrayref",
  "bouncycastle-mldsa",
  "byteorder",
- "dilithium",
  "hex",
  "regex",
  "ring",

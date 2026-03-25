@@ -13,7 +13,6 @@ edition = "2018"
 rng256 = { path = "../rng256" }
 arrayref = "0.3.6"
 subtle = { version = "2.2.3", default-features = false, features = ["nightly"] }
-dilithium = { path = "../../third_party/dilithium" }
 bouncycastle-mldsa = { path = "../../../bc-rust/crypto/mldsa", default-features = false }
 byteorder = { version = "1", default-features = false }
 hex = { version = "0.3.2", default-features = false, optional = true }

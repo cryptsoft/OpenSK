@@ -34,7 +34,7 @@ pub const EDDSA_ALGORITHM: i64 = -8;
 // Used as the identifier for Hybrid in assertion signatures.
 // (numbers less than -65536 are reserved for private use)
 // TODO: Update this number later.
-pub const HYBRID_ALGORITHM: i64 = -65537;
+pub const HYBRID_ALGORITHM: i64 = -49;
 // ML-DSA-65 verification key bytes.
 const MLDSA65_PK_SIZE_PACKED: usize = 1952;
 
@@ -755,7 +755,7 @@ impl CoseKey {
     #[cfg(feature = "ed25519")]
     const OKP_KEY_TYPE: i64 = 1;
     // The key type changes for hybrid. The value is made up.
-    const HYBRID_KEY_TYPE: i64 = -65537;
+    const HYBRID_KEY_TYPE: i64 = -49;
     // The parameter behind map key -1.
     const P_256_CURVE: i64 = 1;
     #[cfg(feature = "ed25519")]
