@@ -14,31 +14,60 @@
 
 use super::ecdsa;
 use alloc::vec::Vec;
+#[cfg(feature = "mldsa44")]
+use bouncycastle_mldsa::{MuBuilder, MLDSA44PublicKey, MLDSA44, MLDSA44_PK_LEN, MLDSA44_SIG_LEN};
+#[cfg(feature = "mldsa65")]
 use bouncycastle_mldsa::{MuBuilder, MLDSA65PublicKey, MLDSA65, MLDSA65_PK_LEN, MLDSA65_SIG_LEN};
+#[cfg(feature = "mldsa87")]
+use bouncycastle_mldsa::{MuBuilder, MLDSA87PublicKey, MLDSA87, MLDSA87_PK_LEN, MLDSA87_SIG_LEN};
 
+#[cfg(feature = "mldsa44")]
+pub const MLDSA_PK_LEN: usize = MLDSA44_PK_LEN;
+#[cfg(feature = "mldsa44")]
+pub const MLDSA_SIG_LEN: usize = MLDSA44_SIG_LEN;
+#[cfg(feature = "mldsa44")]
+pub type MLDSA = MLDSA44;
+#[cfg(feature = "mldsa44")]
+pub type MLDSAPublicKey = MLDSA44PublicKey;
+#[cfg(feature = "mldsa65")]
+pub const MLDSA_PK_LEN: usize = MLDSA65_PK_LEN;
+#[cfg(feature = "mldsa65")]
+pub const MLDSA_SIG_LEN: usize = MLDSA65_SIG_LEN;
+#[cfg(feature = "mldsa65")]
+pub type MLDSA = MLDSA65;
+#[cfg(feature = "mldsa65")]
+pub type MLDSAPublicKey = MLDSA65PublicKey;
+#[cfg(feature = "mldsa87")]
+pub const MLDSA_PK_LEN: usize = MLDSA87_PK_LEN;
+#[cfg(feature = "mldsa87")]
+pub const MLDSA_SIG_LEN: usize = MLDSA87_SIG_LEN;
+#[cfg(feature = "mldsa87")]
+pub type MLDSA = MLDSA87;
+#[cfg(feature = "mldsa87")]
+pub type MLDSAPublicKey = MLDSA87PublicKey;
 
 // A label generated uniformly at random from the output space of SHA256.
 const LABEL: [u8; 32] = [
     43, 253, 32, 250, 19, 51, 24, 237, 138, 49, 47, 182, 4, 194, 133, 183, 177, 218, 115, 58, 92,
     117, 45, 172, 156, 5, 214, 176, 248, 103, 55, 216,
 ];
-const MLDSA65_SEED_BYTES: usize = 32;
+const MLDSA_SEED_BYTES: usize = 32;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SecKey {
-    mldsa65_seed: [u8; MLDSA65_SEED_BYTES],
+    mldsa_seed: [u8; MLDSA_SEED_BYTES],
     ecdsa_sk: ecdsa::SecKey,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PubKey {
-    pub mldsa65_pk: [u8; MLDSA65_PK_LEN],
+    pub mldsa_pk: [u8; MLDSA_PK_LEN],
     pub ecdsa_pk: ecdsa::PubKey,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Signature {
-    pub mldsa65_sign: [u8; MLDSA65_SIG_LEN],
+    pub mldsa_sign: [u8; MLDSA_SIG_LEN],
     pub ecdsa_sign: ecdsa::Signature,
 }
 
@@ -72,16 +101,16 @@ fn mldsa_mu(msg: &[u8], ecdsa_der: &[u8], tr: &[u8; 64]) -> [u8; 64] {
 }
 
 impl SecKey {
-    pub const BYTES_LENGTH: usize = 32 + MLDSA65_SEED_BYTES;
+    pub const BYTES_LENGTH: usize = 32 + MLDSA_SEED_BYTES;
 
     pub fn gensk<R>(rng: &mut R) -> SecKey
     where
         R: rng256::Rng256,
     {
-        let mut seed = [0u8; MLDSA65_SEED_BYTES];
+        let mut seed = [0u8; MLDSA_SEED_BYTES];
         rng.fill_bytes(&mut seed);
         SecKey {
-            mldsa65_seed: seed,
+            mldsa_seed: seed,
             ecdsa_sk: ecdsa::SecKey::gensk(rng),
         }
     }
@@ -90,27 +119,27 @@ impl SecKey {
     where
         R: rng256::Rng256,
     {
-        let mut seed = [0u8; MLDSA65_SEED_BYTES];
+        let mut seed = [0u8; MLDSA_SEED_BYTES];
         rng.fill_bytes(&mut seed);
-        let mldsa65_pk = MLDSA65::pk_encode_from_seed_bytes(&seed).unwrap();
+        let mldsa_pk = MLDSA::pk_encode_from_seed_bytes(&seed).unwrap();
         let ecdsa_sk = ecdsa::SecKey::gensk(rng);
         let ecdsa_pk = ecdsa_sk.genpk();
 
         let sk = SecKey {
-            mldsa65_seed: seed,
+            mldsa_seed: seed,
             ecdsa_sk,
         };
         let pk = PubKey {
-            mldsa65_pk,
+            mldsa_pk,
             ecdsa_pk,
         };
         (sk, pk)
     }
 
     pub fn genpk(&self) -> PubKey {
-        let mldsa65_pk = MLDSA65::pk_encode_from_seed_bytes(&self.mldsa65_seed).unwrap();
+        let mldsa_pk = MLDSA::pk_encode_from_seed_bytes(&self.mldsa_seed).unwrap();
         PubKey {
-            mldsa65_pk,
+            mldsa_pk: mldsa_pk,
             ecdsa_pk: self.ecdsa_sk.genpk(),
         }
     }
@@ -131,21 +160,21 @@ impl SecKey {
         let ecdsa_der_len = ecdsa_sign.to_asn1_der_out(&mut ecdsa_der);
         let ecdsa_der = &ecdsa_der[..ecdsa_der_len];
 
-        let mldsa65_sk = MLDSA65::private_key_from_seed_bytes(&self.mldsa65_seed).unwrap();
-        let mu = mldsa_mu(msg, ecdsa_der, &mldsa65_sk.public_key_hash());
+        let mldsa_sk = MLDSA::private_key_from_seed_bytes(&self.mldsa_seed).unwrap();
+        let mu = mldsa_mu(msg, ecdsa_der, &mldsa_sk.public_key_hash());
         let mldsa_signing_randomness = mldsa_signing_randomness::<H>(msg, ecdsa_der);
-        let mut mldsa65_sign = [0u8; MLDSA65_SIG_LEN];
-        MLDSA65::sign_mu_deterministic_out(
-            &mldsa65_sk,
+        let mut mldsa_sign = [0u8; MLDSA_SIG_LEN];
+        MLDSA::sign_mu_deterministic_out(
+            &mldsa_sk,
             &mu,
             mldsa_signing_randomness,
-            &mut mldsa65_sign,
+            &mut mldsa_sign,
         )
         .unwrap();
 
         Signature {
             ecdsa_sign,
-            mldsa65_sign,
+            mldsa_sign: mldsa_sign,
         }
     }
 
@@ -153,24 +182,24 @@ impl SecKey {
         let ecdsa_bytes = array_ref!(bytes, 0, 32);
         let ecdsa_sk = ecdsa::SecKey::from_bytes(&ecdsa_bytes)?;
 
-        let mldsa65_seed = array_ref!(bytes, 32, MLDSA65_SEED_BYTES).clone();
+        let mldsa_seed = array_ref!(bytes, 32, MLDSA_SEED_BYTES).clone();
 
         Some(SecKey {
             ecdsa_sk,
-            mldsa65_seed,
+            mldsa_seed: mldsa_seed,
         })
     }
 
     pub fn to_bytes(&self, bytes: &mut [u8; SecKey::BYTES_LENGTH]) {
         let mut ecdsa_bytes = array_mut_ref!(bytes, 0, 32);
         self.ecdsa_sk.to_bytes(&mut ecdsa_bytes);
-        let mldsa_bytes = array_mut_ref!(bytes, 32, MLDSA65_SEED_BYTES);
-        mldsa_bytes.copy_from_slice(&self.mldsa65_seed);
+        let mldsa_bytes = array_mut_ref!(bytes, 32, MLDSA_SEED_BYTES);
+        mldsa_bytes.copy_from_slice(&self.mldsa_seed);
     }
 }
 
 impl PubKey {
-    pub const BYTES_LENGTH: usize = 2 * ecdsa::NBYTES + MLDSA65_PK_LEN;
+    pub const BYTES_LENGTH: usize = 2 * ecdsa::NBYTES + MLDSA_PK_LEN;
 
     pub fn from_bytes(bytes: &[u8; PubKey::BYTES_LENGTH]) -> Option<PubKey> {
         let ecdsa_x_bytes = array_ref!(bytes, 0, ecdsa::NBYTES);
@@ -178,16 +207,16 @@ impl PubKey {
 
         let ecdsa_pk = ecdsa::PubKey::from_coordinates(&ecdsa_x_bytes, &ecdsa_y_bytes)?;
 
-        let mldsa65_pk = array_ref!(
+        let mldsa_pk = array_ref!(
             bytes,
             ecdsa::NBYTES + ecdsa::NBYTES,
-            MLDSA65_PK_LEN
+            MLDSA_PK_LEN
         )
         .clone();
 
         Some(PubKey {
             ecdsa_pk,
-            mldsa65_pk,
+            mldsa_pk: mldsa_pk,
         })
     }
 
@@ -204,9 +233,9 @@ impl PubKey {
         let mldsa_bytes = array_mut_ref!(
             bytes,
             ecdsa::NBYTES + ecdsa::NBYTES,
-            MLDSA65_PK_LEN
+            MLDSA_PK_LEN
         );
-        mldsa_bytes.copy_from_slice(&self.mldsa65_pk);
+        mldsa_bytes.copy_from_slice(&self.mldsa_pk);
     }
 
     pub fn verify_vartime<H>(&self, msg: &[u8], sign: &Signature) -> bool
@@ -216,17 +245,17 @@ impl PubKey {
         let mut ecdsa_der = [0u8; ecdsa::Signature::MAX_ASN1_DER_LENGTH];
         let ecdsa_der_len = sign.ecdsa_sign.to_asn1_der_out(&mut ecdsa_der);
         let ecdsa_der = &ecdsa_der[..ecdsa_der_len];
-        let mldsa65_pk = MLDSA65PublicKey::from_pk_bytes(&self.mldsa65_pk);
-        let mu = mldsa_mu(msg, ecdsa_der, &mldsa65_pk.compute_tr());
+        let mldsa_pk = MLDSAPublicKey::from_pk_bytes(&self.mldsa_pk);
+        let mu = mldsa_mu(msg, ecdsa_der, &mldsa_pk.compute_tr());
 
         self.ecdsa_pk
             .verify_hash_vartime(&ecdsa_input_hash::<H>(msg), &sign.ecdsa_sign)
-            && MLDSA65::verify_mu(&mldsa65_pk, &mu, &sign.mldsa65_sign).is_ok()
+            && MLDSA::verify_mu(&mldsa_pk, &mu, &sign.mldsa_sign).is_ok()
     }
 }
 
 impl Signature {
-    pub const BYTES_LENGTH: usize = 64 + MLDSA65_SIG_LEN;
+    pub const BYTES_LENGTH: usize = 64 + MLDSA_SIG_LEN;
 
     /// Converts a signature into the CBOR required byte array representation.
     ///
@@ -234,9 +263,9 @@ impl Signature {
     pub fn to_asn1_der(self) -> Vec<u8> {
         let mut ecdsa_der = [0u8; ecdsa::Signature::MAX_ASN1_DER_LENGTH];
         let ecdsa_der_len = self.ecdsa_sign.to_asn1_der_out(&mut ecdsa_der);
-        let mut bytes = Vec::with_capacity(ecdsa_der_len + MLDSA65_SIG_LEN);
+        let mut bytes = Vec::with_capacity(ecdsa_der_len + MLDSA_SIG_LEN);
         bytes.extend_from_slice(&ecdsa_der[..ecdsa_der_len]);
-        bytes.extend_from_slice(&self.mldsa65_sign);
+        bytes.extend_from_slice(&self.mldsa_sign);
         bytes
     }
 }

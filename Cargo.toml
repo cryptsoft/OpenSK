@@ -29,6 +29,14 @@ dilithium = { path = "third_party/dilithium" }
 either = { version = "=1.13.0", default-features = false } 
 libc = "=0.2.160"
 [features]
+#You can set ml-dsa size here. 
+#WebAuthn is not playing nice when you switching ML-DSA types.
+#You might need to erase the storage on the device before flashing
+#if you are running into "NotAllowedError" error when trying to create a passkey 
+default = ["mldsa44"]
+mldsa44 = ["crypto/mldsa44"]
+mldsa65 = ["crypto/mldsa65"]
+mldsa87 = ["crypto/mldsa87"]
 debug_allocations = ["lang_items/debug_allocations"]
 debug_ctap = ["libtock_drivers/debug_ctap"]
 panic_console = ["lang_items/panic_console"]

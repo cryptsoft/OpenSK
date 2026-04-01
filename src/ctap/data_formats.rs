@@ -34,10 +34,24 @@ pub const EDDSA_ALGORITHM: i64 = -8;
 // Used as the identifier for Hybrid in assertion signatures.
 // (numbers less than -65536 are reserved for private use)
 // TODO: Update this number later.
+#[cfg(feature = "mldsa44")]
+pub const HYBRID_ALGORITHM: i64 = -48;
+#[cfg(feature = "mldsa65")]
 pub const HYBRID_ALGORITHM: i64 = -49;
+#[cfg(feature = "mldsa87")]
+pub const HYBRID_ALGORITHM: i64 = -50;
+// ML-DSA-44 verification key bytes.
+const MLDSA44_PK_SIZE_PACKED: usize = 1312;
 // ML-DSA-65 verification key bytes.
 const MLDSA65_PK_SIZE_PACKED: usize = 1952;
-
+// ML-DSA-87 verification key bytes.
+const MLDSA87_PK_SIZE_PACKED: usize = 2592;
+#[cfg(feature = "mldsa44")]
+const MLDSA_PK_SIZE_PACKED: usize = MLDSA44_PK_SIZE_PACKED;
+#[cfg(feature = "mldsa65")]
+const MLDSA_PK_SIZE_PACKED: usize = MLDSA65_PK_SIZE_PACKED;
+#[cfg(feature = "mldsa87")]
+const MLDSA_PK_SIZE_PACKED: usize = MLDSA87_PK_SIZE_PACKED;
 // https://www.w3.org/TR/webauthn/#dictdef-publickeycredentialrpentity
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "fuzz", derive(Arbitrary))]
@@ -755,7 +769,12 @@ impl CoseKey {
     #[cfg(feature = "ed25519")]
     const OKP_KEY_TYPE: i64 = 1;
     // The key type changes for hybrid. The value is made up.
+    #[cfg(feature = "mldsa44")]
+    const HYBRID_KEY_TYPE: i64 = -48;
+    #[cfg(feature = "mldsa65")]
     const HYBRID_KEY_TYPE: i64 = -49;
+    #[cfg(feature = "mldsa87")]
+    const HYBRID_KEY_TYPE: i64 = -50;
     // The parameter behind map key -1.
     const P_256_CURVE: i64 = 1;
     #[cfg(feature = "ed25519")]
@@ -809,7 +828,7 @@ impl TryFrom<cbor::Value> for CoseKey {
             None
         } else {
             let dilithium_bytes = extract_byte_string(ok_or_missing(dilithium_bytes)?)?;
-            if dilithium_bytes.len() != MLDSA65_PK_SIZE_PACKED {
+            if dilithium_bytes.len() != MLDSA_PK_SIZE_PACKED {
                 return Err(Ctap2StatusCode::CTAP1_ERR_INVALID_PARAMETER);
             }
             Some(dilithium_bytes)
@@ -900,14 +919,14 @@ impl From<hybrid::PubKey> for CoseKey {
         let mut ecdsa_y_bytes = [0; ecdsa::NBYTES];
         pk.ecdsa_pk
             .to_coordinates(&mut ecdsa_x_bytes, &mut ecdsa_y_bytes);
-        let mut dilithium_bytes = vec![0; MLDSA65_PK_SIZE_PACKED];
-        dilithium_bytes.copy_from_slice(&pk.mldsa65_pk);
+        let mut dilithium_bytes = vec![0; MLDSA_PK_SIZE_PACKED];
+        dilithium_bytes.copy_from_slice(&pk.mldsa_pk);
         CoseKey {
             x_bytes: ecdsa_x_bytes,
             y_bytes: ecdsa_y_bytes,
             key_type: CoseKey::EC2_KEY_TYPE,
             curve: CoseKey::P_256_CURVE,
-            algorithm: ES256_ALGORITHM,
+            algorithm: HYBRID_ALGORITHM,
             dilithium_bytes: Some(dilithium_bytes),
         }
     }
