@@ -930,7 +930,7 @@ impl CtapState {
         } else {
             None
         };
-        let (signature, x5c) = match attestation_id {
+        let (signature, x5c, alg) = match attestation_id {
             Some(id) => {
                 let Attestation {
                     private_key,
@@ -945,25 +945,17 @@ impl CtapState {
                         .sign_rfc6979::<Sha256>(&signature_data)
                         .to_asn1_der(),
                     Some(vec![certificate]),
+                    SignatureAlgorithm::Es256 as i64,
                 )
             }
-            None => {
-                if matches!(algorithm, SignatureAlgorithm::Hybrid) {
-                    // We can't attest with Dilithium due to message size limits.
-                    let new_ecdsa_key = ecdsa::SecKey::gensk(env.rng());
-                    (
-                        new_ecdsa_key
-                            .sign_rfc6979::<Sha256>(&signature_data)
-                            .to_asn1_der(),
-                        None,
-                    )
-                } else {
-                    (private_key.sign_and_encode(env, &signature_data)?, None)
-                }
-            }
+            None => (
+                private_key.sign_and_encode(env, &signature_data)?,
+                None,
+                algorithm as i64,
+            ),
         };
         let attestation_statement = PackedAttestationStatement {
-            alg: SignatureAlgorithm::Es256 as i64,
+            alg,
             sig: signature,
             x5c,
             ecdaa_key_id: None,
@@ -1484,7 +1476,7 @@ mod test {
     use super::data_formats::{
         ClientPinSubCommand, CoseKey, CredentialManagementSubCommand, GetAssertionHmacSecretInput,
         GetAssertionOptions, MakeCredentialExtensions, MakeCredentialOptions, PinUvAuthProtocol,
-        PublicKeyCredentialRpEntity, PublicKeyCredentialUserEntity,
+        PublicKeyCredentialRpEntity, PublicKeyCredentialUserEntity, HYBRID_ALGORITHM,
     };
     use super::pin_protocol::{authenticate_pin_uv_auth_token, PinProtocol};
     use super::*;
@@ -1725,6 +1717,29 @@ mod test {
             CBOR_CREDENTIAL_ID_SIZE as u8,
             &[],
         );
+    }
+
+    #[test]
+    fn test_process_make_credential_hybrid_self_attestation() {
+        let mut env = TestEnv::new();
+        let mut ctap_state = CtapState::new(&mut env, CtapInstant::new(0));
+
+        let mut make_credential_params = create_minimal_make_credential_parameters();
+        make_credential_params.pub_key_cred_params = vec![HYBRID_CRED_PARAM];
+        let make_credential_response =
+            ctap_state.process_make_credential(&mut env, make_credential_params, DUMMY_CHANNEL);
+
+        match make_credential_response.as_ref().unwrap() {
+            ResponseData::AuthenticatorMakeCredential(response) => {
+                assert_eq!(response.fmt, "packed");
+                assert_eq!(response.att_stmt.alg, HYBRID_ALGORITHM);
+                // Self-attestation: no x5c certificate chain.
+                assert!(response.att_stmt.x5c.is_none());
+                // Hybrid signature = ECDSA DER (~70 bytes) + ML-DSA raw signature.
+                assert!(response.att_stmt.sig.len() > 2000);
+            }
+            _ => panic!("Invalid response type"),
+        }
     }
 
     #[test]

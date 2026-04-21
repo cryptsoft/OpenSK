@@ -780,8 +780,8 @@ class OpenSKInstaller:
     if board_props.metadata_address is not None:
       self.build_bootloader()
 
+    self.generate_crypto_materials(self.args.regenerate_keys)
     if self.args.application == "ctap2":
-      self.generate_crypto_materials(self.args.regenerate_keys)
       self.build_opensk()
     elif self.args.application is None:
       info("No application selected.")

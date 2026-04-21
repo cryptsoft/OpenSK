@@ -33,7 +33,7 @@ libc = "=0.2.160"
 #WebAuthn is not playing nice when you switching ML-DSA types.
 #You might need to erase the storage on the device before flashing
 #if you are running into "NotAllowedError" error when trying to create a passkey 
-default = ["mldsa44"]
+default = ["mldsa65"]
 mldsa44 = ["crypto/mldsa44"]
 mldsa65 = ["crypto/mldsa65"]
 mldsa87 = ["crypto/mldsa87"]
